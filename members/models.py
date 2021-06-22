@@ -6,4 +6,6 @@ class Members(models.Model):
     date = models.DateField(blank=True, null=True)
     new = models.PositiveIntegerField(blank=True, null=True)
     total = models.PositiveIntegerField(blank=True, null=True)
-    stores = models.ForeignKey(Stores, on_delete=models.CASCADE)
+    eff_new = models.PositiveIntegerField(blank=True, null=True)
+    eff_total = models.PositiveIntegerField(blank=True, null=True)
+    label = models.CharField(max_length=256, blank=True, null=True)
