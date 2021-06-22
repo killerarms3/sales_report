@@ -39,8 +39,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'extra_table',
     'smt_report',
-    'invertory',
+    'inventory',
     'members',
+    'SKU_report',
 ]
 
 MIDDLEWARE = [
