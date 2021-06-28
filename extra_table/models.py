@@ -7,7 +7,6 @@ class Stores(models.Model):
     category = models.CharField(max_length=256, blank=True, null=True)
     subtype = models.CharField(max_length=256, blank=True, null=True)
 
-
 class SKU(models.Model):
     name = models.CharField(max_length=256, blank=True, null=True)
     sku = models.CharField(max_length=256, blank=True, null=True)

@@ -11,5 +11,5 @@ class DailySalesBySKU(models.Model):
 class DailyInventoryBySKU(models.Model):
     date = models.DateField(blank=True, null=True)
     sku = models.ForeignKey(SKU, on_delete=models.CASCADE)
-    stores_house = models.ForeignKey(Store_house, on_delete=models.CASCADE)
+    store_house = models.ForeignKey(Store_house, on_delete=models.CASCADE)
     counts = models.PositiveIntegerField(blank=True, null=True)
