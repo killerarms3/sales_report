@@ -18,3 +18,9 @@ class Store_house(models.Model):
     name = models.CharField(max_length=256, blank=True, null=True)
     category = models.CharField(max_length=256, blank=True, null=True)
     subtype = models.CharField(max_length=256, blank=True, null=True)
+
+
+class CRM_tags(models.Model):
+    tag = models.CharField(max_length=256)
+    category = models.CharField(max_length=256)
+    subtype = models.CharField(max_length=256)
