@@ -1,11 +1,11 @@
 from django.db import models
-from extra_table.models import Stores
+from extra_table.models import Stores, CRM_tags 
 
 # Create your models here.
 class Members(models.Model):
-    date = models.DateField(blank=True, null=True)
-    new = models.PositiveIntegerField(blank=True, null=True)
-    total = models.PositiveIntegerField(blank=True, null=True)
-    eff_new = models.PositiveIntegerField(blank=True, null=True)
-    eff_total = models.PositiveIntegerField(blank=True, null=True)
-    label = models.CharField(max_length=256, blank=True, null=True)
+    date = models.DateField()
+    new = models.PositiveIntegerField()
+    total = models.PositiveIntegerField()
+    eff_new = models.PositiveIntegerField()
+    eff_total = models.PositiveIntegerField()
+    label = models.ForeignKey(CRM_tags, on_delete=models.CASCADE)

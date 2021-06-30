@@ -3,9 +3,9 @@ from extra_table.models import Stores
 
 # Create your models here.
 class smt_report(models.Model):
-    date = models.DateField(blank=True, null=True)
-    sales = models.IntegerField(blank=True, null=True)
-    sales_budget = models.PositiveIntegerField(blank=True, null=True)
-    margin = models.IntegerField(blank=True, null=True)
-    margin_budget = models.PositiveIntegerField(blank=True, null=True)
+    date = models.DateField()
+    sales = models.IntegerField()
+    sales_budget = models.PositiveIntegerField()
+    margin = models.IntegerField()
+    margin_budget = models.PositiveIntegerField()
     stores = models.ForeignKey(Stores, on_delete=models.CASCADE)

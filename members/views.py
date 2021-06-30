@@ -111,7 +111,7 @@ def save_members():
         member.total = total_member[tag.tag]['total_member']
         member.eff_new = week_member[tag.tag]['valid_member']
         member.eff_total = total_member[tag.tag]['valid_member']
-        member.label = tag.tag
+        member.label = tag
         member.save()
 
 # Group結果
