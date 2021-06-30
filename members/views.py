@@ -2,7 +2,9 @@ from django.shortcuts import render
 from members.models import Members
 from extra_table.models import CRM_tags
 from django.conf import settings
+from django.http import HttpResponse, Http404
 from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -12,6 +14,7 @@ import datetime
 import openpyxl
 from openpyxl.styles import PatternFill, Side, Border
 import os
+import glob
 # Create your views here.
 
 def get_driver(executable_path):
@@ -83,7 +86,9 @@ def get_members(start=None, end=None):
                 'total_member': total_member,
                 'valid_member': has_order - nophone_has_order
             }
-
+    except TimeoutException:
+        # CRM帳密要到期需要更換
+        driver.quit()
     finally:
         driver.quit()
     return members_dict
@@ -195,3 +200,21 @@ def export_members(last_1_week_date):
         member_sheet[letter+str(insert_row_count)] = '= SUM(%s)' % (', '.join([letter+str(c) for c in total_rows]))
         valid_member_sheet[letter+str(insert_row_count)] = '= SUM(%s)' % (', '.join([letter+str(c) for c in total_rows]))
     wb_template.save(output_file)
+
+def members_report(request):
+    reports = dict()
+    for file_path in glob.glob(os.path.join(settings.BASE_DIR, 'output', 'Members*.xlsx')):
+        filename = os.path.basename(file_path)
+        date = re.findall(r'\d+', filename)[0]
+        reports[date] = filename
+    return render(request,'members_report.html', locals())
+
+
+def download(request, filename):
+    file_path = os.path.join(settings.BASE_DIR, 'output', filename)
+    if os.path.exists(file_path):
+        with open(file_path, 'rb') as fh:
+            response = HttpResponse(fh.read(), content_type="application/vnd.ms-excel")
+            response['Content-Disposition'] = 'inline; filename=' + os.path.basename(file_path)
+            return response
+    raise Http404

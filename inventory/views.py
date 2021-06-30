@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from django.http import HttpResponse, Http404
 from django.views.decorators.csrf import csrf_protect
 from inventory.models import Inventory
 from extra_table.models import Store_house, SKU
@@ -9,6 +10,8 @@ from openpyxl.styles import PatternFill, Side, Border
 from decimal import Decimal
 import datetime
 import os
+import glob
+import re
 # Create your views here.
 
 def inventory(excel_file):
@@ -144,3 +147,21 @@ def export_inventory(last_1_week_date, inventorybysku_dict, subtype_list):
                 inventorybysku_sheet[get_column_letter(4+idy)+str(insert_row_count)].border = border
             insert_row_count += 1
     wb_template.save(output_file)
+
+def inventory_report(request):
+    reports = dict()
+    for file_path in glob.glob(os.path.join(settings.BASE_DIR, 'output', 'Inventory*.xlsx')):
+        filename = os.path.basename(file_path)
+        date = re.findall(r'\d+', filename)[0]
+        reports[date] = filename
+    return render(request,'inventory_report.html', locals())
+
+
+def download(request, filename):
+    file_path = os.path.join(settings.BASE_DIR, 'output', filename)
+    if os.path.exists(file_path):
+        with open(file_path, 'rb') as fh:
+            response = HttpResponse(fh.read(), content_type="application/vnd.ms-excel")
+            response['Content-Disposition'] = 'inline; filename=' + os.path.basename(file_path)
+            return response
+    raise Http404
