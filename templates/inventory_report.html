@@ -11,6 +11,23 @@
     <div class="card mb-3">
         <div class="card-body">
             <h3>庫存報表</h3>
+            <p>* 輸入日會被轉換為當週週一日期</p>
+            <form method="POST" action="" id="regenerate" enctype="multipart/form-data">
+                {% csrf_token %}
+                <table class="table table-hover">
+                    <tbody>
+                        <tr style="border-bottom: hidden">
+                            <td>
+                                <div class="input-group mb-3">
+                                    <label class="input-group-text" for="date">日期</label>
+                                    <input type="date" class="form-control" id="date" name="date" format="YYYY-MM-DD" placeholder="YYYY-MM-DD" required>
+                                    <button class="btn btn-outline-secondary" id="submit_form">重新產生報表</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </form>
                 <table id="reports" class="display" style="width:100%">
                     <thead>
                         <th>日期</th>
@@ -43,5 +60,10 @@
             "paging":         false
         } );
     } );
+    $('form').submit(function () {
+        $('#submit_form').val('處理中 ...')
+            .attr('disabled','disabled');
+            return;
+    });
 </script>
 {% endblock js %}
