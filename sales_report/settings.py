@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_crontab',
     'extra_table',
     'smt_report',
     'inventory',
@@ -114,7 +115,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Taipei'
 
 USE_I18N = True
 
@@ -127,6 +128,13 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
 STATIC_URL = '/static/'
+
+# CRONJOBS
+CRONJOBS = [
+        ('0 0 * * 1', 'members.views.save_members'), # every Monday at 0:00
+        ('0 7 * * 1', 'members.views.export_members') # every Monday at 7:00
+]
+
 
 # Selenium
 PATH_GECKODRIVER = os.path.join(BASE_DIR, 'geckodriver')

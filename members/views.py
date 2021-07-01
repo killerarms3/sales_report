@@ -101,11 +101,11 @@ def save_members():
     total_member = get_members(start=datetime.datetime(2020,12,22), end=last_week_end)
     week_member = get_members(start=last_week_start, end=last_week_end)
     for tag in CRM_tags.objects.all():
-        date = (last_week_end - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
-        if not Members.objects.filter(date=date, label=tag.tag):
+        date = (last_week_end + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+        if not Members.objects.filter(date=date, label=tag):
             member = Members()
         else:
-            member = Members.objects.filter(date=date, label=tag.tag)[0]
+            member = Members.objects.filter(date=date, label=tag)[0]
         member.date = date
         member.new = week_member[tag.tag]['total_member']
         member.total = total_member[tag.tag]['total_member']
@@ -118,7 +118,7 @@ def save_members():
 def group_result(date):
     result_dict = dict()
     for tag in CRM_tags.objects.all():
-        members = Members.objects.filter(date=date.strftime('%Y-%m-%d'), label=tag.tag)
+        members = Members.objects.filter(date=date.strftime('%Y-%m-%d'), label=tag)
         if tag.category not in result_dict:
             result_dict[tag.category] = dict()
         if tag.subtype not in result_dict[tag.category]:
@@ -136,8 +136,10 @@ def group_result(date):
             result_dict[tag.category][tag.subtype]['eff_total'] += member.eff_total
     return result_dict
 
-def export_members(last_1_week_date):
+def export_members():
     # last_1_week_date: datetime (monday)
+    today = datetime.datetime.now()
+    last_1_week_date = today - datetime.timedelta(days=today.weekday() + 1) + datetime.timedelta(days=1)
     template = os.path.join(settings.BASE_DIR, 'excel_templates', 'members.xlsx')
     output_file = os.path.join(settings.BASE_DIR, 'output', 'Members%s.xlsx' % last_1_week_date.strftime('%Y%m%d'))
 
