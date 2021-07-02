@@ -18,9 +18,11 @@ from django.urls import path
 from django.urls import include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.generic import RedirectView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('', RedirectView.as_view(url = 'members/', permanent = True)),
     path('inventory/', include('inventory.urls', namespace='inventory')),
     path('members/', include('members.urls', namespace='members'))
 ]
