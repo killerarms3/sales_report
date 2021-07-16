@@ -71,7 +71,6 @@ def group_inventorybysku(date):
             result_dict[inventorybysku.sku]['total'] += inventorybysku.counts
     return result_dict, list(subtypes)
 
-
 def group_inventory(date):
     result_dict = dict()
     for store_house in Store_house.objects.all():

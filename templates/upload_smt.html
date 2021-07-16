@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block head_title %} | 銷售資料上傳{% endblock %}
+{% block extra_head %}
+{% load static %}
+<meta charset="utf-8">
+{% endblock extra_head %}
+
+{% block content %}
+<br>
+<div class="container">
+    <div class="card mb-3">
+        <div class="card-body">
+            <h3>銷售資料上傳</h3>
+            <form method="POST" action="" id="upload_file" enctype="multipart/form-data">
+                {% csrf_token %}
+                {% if errors %}
+                {% for error in errors %}
+                <font color="#FF0000">
+                    <p style="font-size: 12px; ">* {{ error }}</p>
+                </font>
+                {% endfor %}
+                {% endif %}
+                <table class="table table-hover">
+                    <tbody>
+                        <tr style="border-bottom: hidden">
+                            <td>                                
+                                會員日期商品消費明細表上傳                         
+                                <div class="input-group mb-3">
+                                    <input type="file" class="form-control" id="smt1" name="smt1">
+                                    <label class="input-group-text" for="smt1">Upload</label>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                訂金查詢作業上傳
+                                <div class="input-group mb-3">
+                                    <input type="file" class="form-control" id="smt2" name="smt2">
+                                    <label class="input-group-text" for="smt2">Upload</label>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                訂金未出貨商品明細表上傳
+                                <div class="input-group mb-3">
+                                    <input type="file" class="form-control" id="smt3" name="smt3">
+                                    <label class="input-group-text" for="smt3">Upload</label>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <button id="submit_form" style="background-color: #19bdf2; border-color: #19bdf2;" class="btn btn-primary btn-lg btn-block">Submit</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block js %}
+<script>
+    $('form').submit(function () {
+        $('#submit_form').val('處理中 ...')
+            .attr('disabled','disabled');
+            return;
+    });
+</script>
+{% endblock js %}
+
