@@ -8,5 +8,3 @@ urlpatterns=[
     path('inventory_report', views.inventory_report, name='inventory_report'),
     path('download/<filename>', views.download, name='download')
     ]
-
-

@@ -237,7 +237,7 @@ sales_dict = {
 }
 '''
 
-# 在這裡一併處理budget, 跟存進database的兩個步驟
+# 在這裡一併處理budget, 與儲存進database的兩個步驟
 # 決定報表內容(當日報表、WTD、YTD、月報表)
 def group_sales(start_date, end_date, group_dict, sales_dict):
     result_dict = dict()
@@ -256,9 +256,21 @@ def group_sales(start_date, end_date, group_dict, sales_dict):
                 result_dict[group_dict[store]['primary']][store]['tickets_num'] += len(sales_dict[date][store]['tickets'])
                 result_dict[group_dict[store]['primary']][store]['sales'] += sales_dict[date][store]['sales']
                 result_dict[group_dict[store]['primary']][store]['cost'] += sales_dict[date][store]['cost']
-        # create smt_report data by date
-        Smt_Report = smt_report.object.all()
-        
+    # create smt_report data by date
+    for date in sales_dict:
+        if date >= start_date and date <= end_date:
+            stores_list = Stores.objects.all().values_list('name')
+            for store in stores_list:
+                stores = Stores.objects.get(name = store)
+                smt_report.objects.create(
+                    date = date,
+                    sales = result_dict[group_dict[store]['primary']][store]['sales'],
+                    margin = result_dict[group_dict[store]['primary']][store]['cost'],
+                    ticket_num = result_dict[group_dict[store]['primary']][store]['tickets_num'],
+                    stores = stores,
+                )
+
+
     return result_dict
 '''
 紀錄從start_date 到 end_date 的總發票數、總銷售數、總成本

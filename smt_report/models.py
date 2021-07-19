@@ -8,5 +8,5 @@ class smt_report(models.Model):
     sales_budget = models.PositiveIntegerField()
     margin = models.IntegerField()
     margin_budget = models.PositiveIntegerField()
-    ticket_num = sales = models.IntegerField()
+    ticket_num = models.IntegerField(default=0)
     stores = models.ForeignKey(Stores, on_delete=models.CASCADE)
