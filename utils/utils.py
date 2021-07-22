@@ -10,7 +10,7 @@ def weektodate(today):
         start_date = today - datetime.timedelta(days=today.weekday() + 7)
     else:
         start_date = today - datetime.timedelta(days=today.weekday())
-    end_date = today - datetime.timedelta(days=1)
+    end_date = today
     return start_date, end_date
 
 # 上個月初至上個月底
@@ -25,7 +25,7 @@ def yeartodate(today):
     # today = datetime.datetime.now()
     this_year_start = datetime.datetime(today.year, 1, 1)
     # 昨天
-    end_date = today - datetime.timedelta(days=1)
+    end_date = today
     # 取得今年YTD第一天
     # 週一回傳0; 週日回傳6
     if this_year_start.weekday() > 3:
@@ -48,6 +48,17 @@ def yeartodate(today):
 
 
 def lineforline(date):
-    # 去年同期
-    
-    pass
+    # 先算今日是當期(年)的第幾日
+    this_start, this_end = yeartodate(date)
+    this_end = datetime.datetime(this_end.year, this_end.month, this_end.day)
+    # 取得上期(年)最後一日
+    last_final = this_start - datetime.timedelta(days=1)
+    # 取得上期(年)第一日
+    last_start, last_end_temp = yeartodate(last_final)
+    # 取得本期(年)過了幾天
+    days_gone = this_end - this_start
+    # 取得上期(年)同一日
+    last_temp = last_start + days_gone
+    last_end = datetime.datetime(last_temp.year, last_temp.month, last_temp.day)
+
+    return this_start, this_end, last_start, last_end

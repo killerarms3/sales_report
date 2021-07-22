@@ -24,7 +24,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', RedirectView.as_view(url = 'members/', permanent = True)),
     path('inventory/', include('inventory.urls', namespace='inventory')),
-    path('members/', include('members.urls', namespace='members'))
+    path('members/', include('members.urls', namespace='members')),
+    path('smt_report/', include('smt_report.urls', namespace='smt_report')),
 ]
 
 

@@ -5,16 +5,17 @@ from django.views.decorators.csrf import csrf_protect
 from django.conf import settings
 from smt_report.models import smt_report
 from SKU_report.models import DailyInventoryBySKU
-from extra_table.models import Store_house, SKU, Stores
+from extra_table.models import Store_house, SKU, Stores, Stores_budget
 import openpyxl
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import PatternFill, Side, Border
 from decimal import Decimal
+import string
 import datetime
 import os
 import glob
 import re
-from utils import utils
+from utils.utils import weektodate, monthly, yeartodate, lineforline
 from django.apps import apps
 
 # Create your views here.
@@ -111,7 +112,7 @@ def export_daily_sales(group_list, daily_sales_dict, template, output_postfix):
         # 讀取模板
         wb_template = openpyxl.load_workbook(template)
         daily_sales_sheet = wb_template['日銷售清單']
-        output_file = date + output_postfix
+        output_file =  output_postfix
         for idx, sku in enumerate(sorted(daily_sales_dict[date].keys(), key=lambda k: daily_sales_dict[date][k]['total'], reverse=True)):
             daily_sales_sheet['A'+str(insert_row_count)] = sku
             daily_sales_sheet['A'+str(insert_row_count)].border = border
@@ -236,15 +237,97 @@ sales_dict = {
     ...
 }
 '''
+# 計算Like for Like
+def caculate_LFL(date, mode):
+    # 初始化
+    this_start, this_end, last_start, last_end = lineforline(date)
+    dateList = []
+    total_sales = 0
+    total_margin = 0
+    total_ticket = 0
+    # 根據模式決定起始/結束日
+    if mode == 'DAY':
+        start_date = last_end
+        end_date = last_end
+    elif mode == 'WTD':        
+        start_date, end_date =  weektodate(last_end)
+    elif mode == 'Month':        
+        start_date, end_date =  monthly(last_end)
+    else:        
+        start_date, end_date =  yeartodate(last_end)
+
+    # 取得這期間的日期清單
+    minus = end_date - start_date
+    for date_count in range(0, minus.days+1):
+        dateList.append(start_date + datetime.timedelta(days = date_count))
+
+    # 取得這期間的sales, margin, ticket總和，若找不到某日則預設該日的值為0
+    LFL_dict = dict()
+    Store = Stores.objects.all()
+    for stores in Store:
+        LFL_dict[stores.name] = dict()
+        LFL_dict[stores.name]['total_sales'] = 0
+        LFL_dict[stores.name]['total_margin'] = 0
+        LFL_dict[stores.name]['total_ticket'] = 0
+        for date in dateList:
+            if smt_report.objects.filter(date = date, stores = stores):
+                Smt_report = smt_report.objects.get(date = date, stores = stores)
+                store = Smt_report.stores.name
+                LFL_dict[store]['total_sales'] += Smt_report.sales
+                LFL_dict[store]['total_margin'] += (Smt_report.sales - Smt_report.margin)
+                LFL_dict[store]['total_ticket'] += Smt_report.ticket_num
+            else:
+                LFL_dict[stores.name]['total_sales'] += 0
+                LFL_dict[stores.name]['total_margin'] += 0
+                LFL_dict[stores.name]['total_ticket'] += 0
+    # 回傳值
+    return LFL_dict
+'''
+LFL_dict = {
+    '內湖店' : {
+        total_sales : total_sales,
+        total_margin : total_margin,
+        total_ticket : total_ticket
+    },
+    ...
+}
+'''
 
 # 在這裡一併處理budget, 與儲存進database的兩個步驟
 # 決定報表內容(當日報表、WTD、YTD、月報表)
-def group_sales(start_date, end_date, group_dict, sales_dict):
+def group_sales(start_date, end_date, group_dict, sales_dict, mode):
     result_dict = dict()
-    for date in sales_dict:
-        if date >= start_date and date <= end_date:
-            for store in sales_dict[date]:
-                store = store.strip()
+    # budget_dict = dict()
+    LFL_dict = dict()
+    minus = end_date - start_date
+    dateList = []
+    for date_count in range(0, minus.days+1):
+        dateList.append(start_date + datetime.timedelta(days = date_count))
+
+    for date in dateList:
+        if date in sales_dict: # 所需日期包含在上傳的資料中
+        #for date in sales_dict:
+            if date >= start_date and date <= end_date:
+                for store in sales_dict[date]:
+                    store = store.strip()
+                    if group_dict[store]['primary'] not in result_dict:
+                        result_dict[group_dict[store]['primary']] = dict()
+                    if store not in result_dict[group_dict[store]['primary']]:
+                        result_dict[group_dict[store]['primary']][store] = {
+                            'tickets_num': 0,
+                            'sales': 0,
+                            'cost': 0
+                        }
+                    result_dict[group_dict[store]['primary']][store]['tickets_num'] += len(sales_dict[date][store]['tickets'])
+                    result_dict[group_dict[store]['primary']][store]['sales'] += sales_dict[date][store]['sales']
+                    result_dict[group_dict[store]['primary']][store]['cost'] += sales_dict[date][store]['cost']
+
+        elif smt_report.objects.filter(date = date): # 若所需日不包含在上傳的資料中，從database找資料
+            Smt_report = smt_report.objects.filter(date = date)
+            for report in Smt_report:
+                store = report.stores.name
+                date = report.date
+
                 if group_dict[store]['primary'] not in result_dict:
                     result_dict[group_dict[store]['primary']] = dict()
                 if store not in result_dict[group_dict[store]['primary']]:
@@ -253,25 +336,48 @@ def group_sales(start_date, end_date, group_dict, sales_dict):
                         'sales': 0,
                         'cost': 0
                     }
-                result_dict[group_dict[store]['primary']][store]['tickets_num'] += len(sales_dict[date][store]['tickets'])
-                result_dict[group_dict[store]['primary']][store]['sales'] += sales_dict[date][store]['sales']
-                result_dict[group_dict[store]['primary']][store]['cost'] += sales_dict[date][store]['cost']
-    # create smt_report data by date
+                result_dict[group_dict[store]['primary']][store]['tickets_num'] += Smt_report.ticket_num
+                result_dict[group_dict[store]['primary']][store]['sales'] += Smt_report.sales
+                result_dict[group_dict[store]['primary']][store]['cost'] += Smt_report.margin
+        else:
+            continue    
+    LFL_dict = caculate_LFL(end_date, mode)
+
+    return result_dict, LFL_dict
+
+
+def save_report(start_date, end_date, group_dict, sales_dict, result_dict):
+    # create/update smt_report data by date
     for date in sales_dict:
         if date >= start_date and date <= end_date:
             stores_list = Stores.objects.all().values_list('name')
-            for store in stores_list:
-                stores = Stores.objects.get(name = store)
-                smt_report.objects.create(
-                    date = date,
-                    sales = result_dict[group_dict[store]['primary']][store]['sales'],
-                    margin = result_dict[group_dict[store]['primary']][store]['cost'],
-                    ticket_num = result_dict[group_dict[store]['primary']][store]['tickets_num'],
-                    stores = stores,
-                )
+            for primary in result_dict:
+                for store in result_dict[primary]:
+                    same_stores = Stores.objects.filter(name = store)
+                    for stores in same_stores:
+                        Budget = Stores_budget.objects.get(stores=stores)
+                        if smt_report.objects.filter(date=date, stores=stores):
+                            single_date = smt_report.objects.get(date=date, stores=stores)
+                            single_date.date = date
+                            single_date.sales = result_dict[group_dict[store]['primary']][store]['sales']
+                            single_date.sales_budget = Budget.sales_budget
+                            single_date.margin = result_dict[group_dict[store]['primary']][store]['cost']
+                            single_date.margin_budget = Budget.margin_budget
+                            single_date.ticket_num = result_dict[group_dict[store]['primary']][store]['tickets_num']
+                            single_date.stores = stores
+                            single_date.save()
+                        else:
+                            smt_report.objects.create(
+                                date = date,
+                                sales = result_dict[group_dict[store]['primary']][store]['sales'],
+                                sales_budget = Budget.sales_budget,
+                                margin = result_dict[group_dict[store]['primary']][store]['cost'],
+                                margin_budget = Budget.margin_budget,
+                                ticket_num = result_dict[group_dict[store]['primary']][store]['tickets_num'],
+                                stores = stores,
+                            )
 
 
-    return result_dict
 '''
 紀錄從start_date 到 end_date 的總發票數、總銷售數、總成本
 result_dict = {
@@ -299,8 +405,9 @@ result_dict = {
     ...
 }
 '''
+
 # 輸出報表
-def export_sales(sales_budget, margin_budget, result_dict, template, output_file):
+def export_sales(result_dict, LFL_dict, template, output_file):
     # style
     gray_fill = PatternFill('solid', fgColor='D0CECE') # 灰色填滿
     bian = Side(style='thin', color='000000') # 設定邊框樣式
@@ -312,20 +419,48 @@ def export_sales(sales_budget, margin_budget, result_dict, template, output_file
     total_rows = [] # 小計行數
     for primary in result_dict:
         start_row = insert_row_count
-        for secondary in result_dict[primary]:
+        stores_list = list()
+        for store_name in result_dict[primary]:
+            Sales = 0
+            LFL_Sales = 0
+            Cost = 0
+            LFL_Margin = 0
+            Tickets = 0
+            LFL_Tickets = 0
+            if store_name in stores_list:
+                continue
+            stores = Stores.objects.get(name = store_name)
+            Secondary = Stores.objects.filter(subtype = stores.subtype)
+            Budget = Stores_budget.objects.get(stores=stores)
+            for secondary in Secondary:
+                if secondary.name in result_dict[primary]:
+                    Sales += result_dict[primary][secondary.name]['sales']
+                    Cost += result_dict[primary][secondary.name]['cost']
+                    Tickets += result_dict[primary][secondary.name]['tickets_num']
+                    LFL_Sales += LFL_dict[secondary.name]['total_sales']                    
+                    LFL_Margin += LFL_dict[secondary.name]['total_margin']                    
+                    LFL_Tickets += LFL_dict[secondary.name]['total_ticket']
+                    stores_list.append(secondary.name)
+                elif secondary.name in LFL_dict:
+                    LFL_Sales += LFL_dict[secondary.name]['total_sales']                    
+                    LFL_Margin += LFL_dict[secondary.name]['total_margin']                    
+                    LFL_Tickets += LFL_dict[secondary.name]['total_ticket']
+                else:
+                    continue
+
             sales_sheet.insert_rows(insert_row_count)
-            sales_sheet['A'+str(insert_row_count)] = secondary # Store
-            sales_sheet['B'+str(insert_row_count)] = result_dict[primary][secondary]['sales'] # Sales $
-            sales_sheet['C'+str(insert_row_count)] = sales_budget # Sales $ Budget
+            sales_sheet['A'+str(insert_row_count)] = stores.subtype # Store
+            sales_sheet['B'+str(insert_row_count)] = Sales # Sales $
+            sales_sheet['C'+str(insert_row_count)] = Budget.sales_budget # Sales $ Budget
             sales_sheet['D'+str(insert_row_count)] = '=ROUND((%s/%s) * 100, 1)' % ('B'+str(insert_row_count), 'C'+str(insert_row_count)) # Sales$ ach%
-            sales_sheet['E'+str(insert_row_count)] = 100 # Sales$ LFL%
+            sales_sheet['E'+str(insert_row_count)] = '=ROUND((%s/%s) * 100, 1)' % (str(Sales), str(LFL_Sales)) # Sales$ LFL%
             sales_sheet['F'+str(insert_row_count)] = '=ROUND((%s/%s) * 100, 1)' % ('G'+str(insert_row_count), 'B'+str(insert_row_count)) # Margin%
-            sales_sheet['G'+str(insert_row_count)] = result_dict[primary][secondary]['sales'] - result_dict[primary][secondary]['cost'] # Margin$
-            sales_sheet['H'+str(insert_row_count)] = margin_budget # Margin$ Budget
+            sales_sheet['G'+str(insert_row_count)] = Sales - Cost # Margin$
+            sales_sheet['H'+str(insert_row_count)] = Budget.margin_budget # Margin$ Budget
             sales_sheet['I'+str(insert_row_count)] = '=ROUND((%s/%s) * 100, 1)' % ('G'+str(insert_row_count), 'H'+str(insert_row_count)) # Margin$ ach%
-            sales_sheet['J'+str(insert_row_count)] = 100 # Margin$ LFL%
-            sales_sheet['K'+str(insert_row_count)] = result_dict[primary][secondary]['tickets_num'] # Tickets #
-            sales_sheet['L'+str(insert_row_count)] = 100 # Tickets# LFL%
+            sales_sheet['J'+str(insert_row_count)] = '=ROUND((%s/%s) * 100, 1)' % (str(Sales - Cost), str(LFL_Margin)) # Margin$ LFL%
+            sales_sheet['K'+str(insert_row_count)] = Tickets # Tickets
+            sales_sheet['L'+str(insert_row_count)] = '=ROUND((%s/%s) * 100, 1)' % (str(Tickets), str(LFL_Tickets)) # Tickets# LFL%
             insert_row_count += 1
         end_row = insert_row_count - 1
         for cell in sum(sales_sheet['A'+str(start_row):'L'+str(end_row)], ()):
@@ -350,13 +485,10 @@ def export_sales(sales_budget, margin_budget, result_dict, template, output_file
         sales_sheet[letter+str(insert_row_count)] = '= SUM(%s)' % (', '.join([letter+str(c) for c in total_rows]))
     wb_template.save(output_file)
 
-def save_smt():
-    pass
-
 # 產生日銷售清單
 def make_daily_sales_file(upload_file1, upload_file2, upload_file3):
     group_dict = dict()
-    group_list = list()        
+    group_list = list()
     stores = Stores.objects.all()
     for token in stores:
         group_dict[token.name] = token.subtype
@@ -369,7 +501,7 @@ def make_daily_sales_file(upload_file1, upload_file2, upload_file3):
     daily_sales_dict = daily_sales(upload_file1, upload_file2, upload_file3, group_dict)
     export_daily_sales(group_list, daily_sales_dict, 'excel_templates/daily_sales.xlsx', output_file) # 產生日銷售清單
 
-# 產生Day/WTD/YTD報表
+# 產生Day/Month/WTD/YTD報表
 def make_sales_file(upload_file1, upload_file2, upload_file3):
     group_dict = dict()
     group_list = list()
@@ -377,7 +509,7 @@ def make_sales_file(upload_file1, upload_file2, upload_file3):
 
     sku = SKU.objects.all()
     stores = Stores.objects.all()
-    for token in SKU:
+    for token in sku:
         product_dict[token.sku] = token.cost
     for token in stores:
         group_dict[token.name] = {
@@ -386,28 +518,57 @@ def make_sales_file(upload_file1, upload_file2, upload_file3):
         }
     today = datetime.datetime.now()
     sales_dict = sales(product_dict, upload_file1, upload_file2, upload_file3)
+
+    # DAY
+    for date in sales_dict:
+        
+        start_date = date
+        end_date = date
+        result_dict, LFL_dict = group_sales(start_date, end_date, group_dict, sales_dict, 'DAY')
+        # save_report(start_date, end_date, group_dict, sales_dict, result_dict)
+        output_file = os.path.join(settings.BASE_DIR, 'output', '%sDAY銷售總表.xlsx' % start_date.strftime('%Y%m%d'))
+        export_sales(result_dict, LFL_dict, 'excel_templates/sales.xlsx', output_file)
     # WTD
-    start_date, end_date = weektodate(today)    
-    result_dict = group_sales(start_date, end_date, group_dict, sales_dict)
-    output_file = os.path.join(settings.BASE_DIR, 'output', '%s_%sWTD銷售總表.xlsx' % start_date.strftime('%Y%m%d'), % end_date.strftime('%Y%m%d'))
-    # export_sales 前兩個輸入為sales_budget, margin_budget 帶修正
-    export_sales(10000, 10000, result_dict, 'templates/sales.xlsx', output_file)
+    for date in sales_dict:        
+        start_date, end_date = weektodate(date)
+        result_dict, LFL_dict = group_sales(start_date, end_date, group_dict, sales_dict, 'WTD')
+        output_file = os.path.join(settings.BASE_DIR, 'output', '%s_%sWTD銷售總表.xlsx' % (start_date.strftime('%Y%m%d'), end_date.strftime('%Y%m%d')))
+        # export_sales 前兩個輸入為sales_budget, margin_budget 待修正
+        export_sales(result_dict, LFL_dict, 'excel_templates/sales.xlsx', output_file)
 
+    # Month
+    for date in sales_dict:
+        if today.day == 1:
+            start_date, end_date = monthly(date)
+            result_dict, LFL_dict = group_sales(start_date, end_date, group_dict, sales_dict, 'Month')
+            output_file = os.path.join(settings.BASE_DIR, 'output', '%s_%sMonth銷售總表.xlsx' % (start_date.strftime('%Y%m%d'), end_date.strftime('%Y%m%d')))
+            # export_sales 前兩個輸入為sales_budget, margin_budget 待修正
+            export_sales(result_dict, LFL_dict, 'excel_templates/sales.xlsx', output_file)
+        else:
+            continue
     # YTD
-    start_date, end_date = yeartodate(today)
-    result_dict = group_sales(start_date, end_date, group_dict, sales_dict)
-    output_file = os.path.join(settings.BASE_DIR, 'output', '%s_%sYTD銷售總表.xlsx' % start_date.strftime('%Y%m%d'), % end_date.strftime('%Y%m%d'))
+    for date in sales_dict:
+        if date == datetime.datetime(2021, 6, 2) or date == datetime.datetime(2020, 5, 27):
+            start_date, end_date = yeartodate(date)
+            result_dict, LFL_dict = group_sales(start_date, end_date, group_dict, sales_dict, 'YTD')
+            output_file = os.path.join(settings.BASE_DIR, 'output', '%s_%sYTD銷售總表.xlsx' % (start_date.strftime('%Y%m%d'), end_date.strftime('%Y%m%d')))
+            export_sales(result_dict, LFL_dict, 'excel_templates/sales.xlsx', output_file)
 
+#
 def upload_smt(request):
     errors = list()
-    if request.method == 'POST':       
+    if request.method == 'POST':
         upload_file1 = request.FILES['smt1']
         upload_file2 = request.FILES['smt2']
         upload_file3 = request.FILES['smt3']
 
         # 產生日銷售清單
-        make_daily_sales_file(upload_file1, upload_file2, upload_file3)      
-        # 產生Day/WTD/YTD報表
-        make_sales_file(upload_file1, upload_file2, upload_file3)  
-        
-       
+        make_daily_sales_file(upload_file1, upload_file2, upload_file3)
+        # 產生Day/Month/WTD/YTD報表
+        # make_sales_file(upload_file1, upload_file2, upload_file3)
+        #return redirect(reverse('smt_report:smt_report'))
+        return render(request,'upload_smt.html', locals())
+    return render(request,'upload_smt.html', locals())
+
+# def smt_report_report(request):
+

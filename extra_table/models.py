@@ -38,8 +38,8 @@ class CRM_tags(models.Model):
 
 class Stores_budget(models.Model):
     stores = models.ForeignKey(Stores, on_delete=models.CASCADE, verbose_name='店櫃名稱')
-    sales_budget = models.PositiveIntegerField(default=0, verbose_name='預期銷量')
-    margin_budget = models.PositiveIntegerField(default=0, verbose_name='預期毛利')
+    sales_budget = models.PositiveIntegerField(default=0, verbose_name='銷量預算')
+    margin_budget = models.PositiveIntegerField(default=0, verbose_name='毛利預算')
     class Meta:
         verbose_name = '店櫃budget'
         verbose_name_plural = '店櫃budget'
